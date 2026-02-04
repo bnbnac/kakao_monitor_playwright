@@ -6,7 +6,7 @@ Playwright는 Selenium보다 가볍고 ARM64에서도 잘 작동합니다.
 """
 
 import asyncio
-import json
+from collections import deque
 import re
 import logging
 import os
@@ -22,7 +22,7 @@ load_dotenv()
 # 로깅 설정
 logger = logging.getLogger(__name__)
 
-MAX_SEEN_POSTS = 1000
+MAX_SEEN_POSTS = 5
 
 
 class KakaoChannelMonitor:
@@ -31,7 +31,8 @@ class KakaoChannelMonitor:
         self.webhook_url = webhook_url
         self.webhook_type = self._detect_webhook_type(webhook_url)
         self.debug = debug
-        self.seen_posts = self._load_seen_posts()
+        self.seen_posts = deque(maxlen=MAX_SEEN_POSTS)
+        self._first_run = True
         self._browser = None
         self._playwright = None
 
@@ -43,27 +44,6 @@ class KakaoChannelMonitor:
         if "hooks.slack.com" in url:
             return "slack"
         return "slack"  # 기본값
-
-    def _load_seen_posts(self):
-        """이전에 본 게시물 해시 로드"""
-        if os.path.exists('seen_posts.json'):
-            try:
-                with open('seen_posts.json', 'r', encoding='utf-8') as f:
-                    return set(json.load(f))
-            except (json.JSONDecodeError, IOError) as e:
-                logger.warning("seen_posts.json 로드 실패, 초기화합니다: %s", e)
-                return set()
-        return set()
-
-    def _save_seen_posts(self):
-        """본 게시물 해시 저장 (최대 MAX_SEEN_POSTS개 유지)"""
-        posts_list = list(self.seen_posts)
-        if len(posts_list) > MAX_SEEN_POSTS:
-            posts_list = posts_list[-MAX_SEEN_POSTS:]
-            self.seen_posts = set(posts_list)
-
-        with open('seen_posts.json', 'w', encoding='utf-8') as f:
-            json.dump(posts_list, f, ensure_ascii=False, indent=2)
 
     async def _ensure_browser(self):
         """브라우저 인스턴스가 없으면 생성, 있으면 재사용"""
@@ -188,15 +168,17 @@ class KakaoChannelMonitor:
         for post in posts:
             if post['id'] not in self.seen_posts:
                 new_posts.append(post)
-                self.seen_posts.add(post['id'])
+                self.seen_posts.append(post['id'])
 
-                if self.webhook_url != "test_mode":
+                if not self._first_run and self.webhook_url != "test_mode":
                     success = await self._send_notification(post)
                     if success:
                         await asyncio.sleep(1)
 
-        if new_posts:
-            self._save_seen_posts()
+        if self._first_run:
+            logger.info("초기 실행: 기존 게시물 %d개 등록 (알림 생략)", len(new_posts))
+            self._first_run = False
+        elif new_posts:
             logger.info("%d개의 새 게시물을 발견했습니다!", len(new_posts))
         else:
             logger.info("새 게시물이 없습니다.")

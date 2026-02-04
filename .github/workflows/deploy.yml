@@ -1,0 +1,29 @@
+name: Deploy to Odroid
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t kakao-monitor .
+
+      - name: Stop existing container
+        run: docker rm -f kakao-monitor || true
+
+      - name: Run container
+        run: |
+          docker run -d \
+            --name kakao-monitor \
+            --restart unless-stopped \
+            -e WEBHOOK_URL="${{ secrets.WEBHOOK_URL }}" \
+            -e KAKAO_CHANNEL_URL="${{ secrets.KAKAO_CHANNEL_URL }}" \
+            -e CHECK_INTERVAL="${{ secrets.CHECK_INTERVAL }}" \
+            kakao-monitor
