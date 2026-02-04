@@ -26,4 +26,7 @@ jobs:
             -e WEBHOOK_URL="${{ secrets.WEBHOOK_URL }}" \
             -e KAKAO_CHANNEL_URL="${{ secrets.KAKAO_CHANNEL_URL }}" \
             -e CHECK_INTERVAL="${{ secrets.CHECK_INTERVAL }}" \
+            --log-driver json-file \
+            --log-opt max-size=10m \
+            --log-opt max-file=3 \
             kakao-monitor
