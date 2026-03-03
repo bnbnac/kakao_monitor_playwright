@@ -67,10 +67,10 @@ class KakaoChannelMonitor:
             self._playwright = None
 
     async def fetch_posts(self):
-        """카카오톡 채널에서 최신 n월m일 게시물 1개를 찾아 반환"""
+        """카카오톡 채널에서 최신 n월m 게시물 1개를 찾아 반환"""
         posts = []
         page = None
-        meal_pattern = re.compile(r'\d{1,2}월\s?\d{1,2}일')
+        meal_pattern = re.compile(r'\d{1,2}월\s?\d{1,2}')
 
         try:
             browser = await self._ensure_browser()
